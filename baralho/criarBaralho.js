@@ -1,18 +1,16 @@
-const prompt = require('prompt-sync')();
+const baralhoSchema = require ("./baralho.schema.js")
 
-module.exports = function criarBaralho(menu, baralhos) {
-  const nome = prompt('Digite o nome do novo baralho: ');
-  const id = baralhos.length > 0 ? Math.max(...baralhos.map(b => b.id)) + 1 : 1;
+async function criarBaralho(req, res) {
+  const { nome } = req.body;
 
-  const novoBaralho = {
-    id: id,
-    nome: nome,
-    flashcards: [] 
-  };
-  
-  baralhos.push(novoBaralho);
-  console.log(`Baralho '${nome}' criado com sucesso!`);
-  
-  menu();
-};
-//
+  try {
+    const baralho = new baralhoSchema ({nome: nome})
+    await baralho.save();
+    return res.status(201).send(`Baralho '${nome}' criado com sucesso!`);
+  } catch (error) {
+    res.send ("Erro ao criar o baralho:",error.message);
+    throw error;
+  }
+}
+
+module.exports = criarBaralho;

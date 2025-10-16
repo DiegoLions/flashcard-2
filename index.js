@@ -1,80 +1,79 @@
-const prompt = require('prompt-sync')();
-const { baralhos, flashcards } = require('./data.js');
+const express = require('express');
+const mongoose = require ('mongoose');
+const dotenv = require ('dotenv');
+const { baralhos, flashcards } = require('./data');
 
-const criarBaralho = require('./baralho/criarBaralho.js');
-const listarBaralhos = require('./baralho/listarBaralhos.js');
-const atualizarBaralho = require('./baralho/atualizarBaralho.js');
-const deletarBaralho = require('./baralho/deletarBaralho.js');
+dotenv.config();
 
-const criarFlashcard = require('./flashcard/criarFlashcard.js');
-const listarFlashcards = require('./flashcard/listarFlashcards.js');
-const atualizarFlashcard = require('./flashcard/atualizarFlashcard.js');
-const deletarFlashcard = require('./flashcard/deletarFlashcard.js');
-const listarFlashcardsPorBaralho = require('./flashcard/listarFlashcardsPorBaralho.js');
-const buscarFlashcardsPorPergunta = require('./flashcard/buscarFlashcardsPorPergunta.js');
+const dbUser = process.env.DB_USER
+const dbPassword = process.env.DB_PASSWORD
 
-function menu() {
-  console.log(`
-  === FLASHCARDS SYSTEM ===
-  
-  --- Baralhos ---
-  1. Criar Baralho
-  2. Listar Baralhos
-  3. Atualizar Baralho
-  4. Deletar Baralho
-  
-  --- Flashcards ---
-  5. Criar Flashcard
-  6. Listar Todos os Flashcards
-  7. Listar Flashcards por Baralho
-  8. Atualizar Flashcard
-  9. Deletar Flashcard
-  10. Buscar Flashcards por Pergunta
-  
-  11. Sair do Sistema de Flashcards
-  `);
-  const opcao = prompt('Escolha uma opção: ');
+mongoose.connect(
+    `mongodb+srv://${dbUser}:${dbPassword}@diegoprojects.vfeiueq.mongodb.net/Baralhos?retryWrites=true&w=majority&appName=DiegoProjects`
+);
+mongoose.connection.once("open",() => {
+    console.log("Conectado ao MongoDB");
+});
+mongoose.connection?.on('error', (err) => {
+    console.error('Error to connect - MongoDB: Error: ${err.message}');
+});
 
-  switch (opcao) {
-    case '1':
-      criarBaralho(menu, baralhos);
-      break;
-    case '2':
-      listarBaralhos(menu, baralhos);
-      break;
-    case '3':
-      atualizarBaralho(menu, baralhos);
-      break;
-    case '4':
-      deletarBaralho(menu, baralhos);
-      break;
-    case '5':
-      criarFlashcard(menu, baralhos);
-      break;
-    case '6':
-      listarFlashcards(menu, baralhos);
-      break;
-    case '7':
-      listarFlashcardsPorBaralho(menu, baralhos);
-      break;
-    case '8':
-      atualizarFlashcard(menu, baralhos);
-      break;
-    case '9':
-      deletarFlashcard(menu, baralhos);
-      break;
-    case '10':
-      buscarFlashcardsPorPergunta(menu, baralhos);
-      break;
-    case '11':
-      console.log('Saindo do sistema. Obrigado por utilizá-lo! Até mais!');
-      return;
-    default:
-      console.log('Opção inválida!');
-      menu();
-      break;
-  }
-}
+const app = express();
+const port = 3000;
+app.use(express.json());
 
-menu();
-//
+const criarBaralho = require('./baralho/criarBaralho');
+const listarBaralhos = require('./baralho/listarBaralhos');
+const atualizarBaralho = require('./baralho/atualizarBaralho');
+const deletarBaralho = require('./baralho/deletarBaralho');
+
+const criarFlashcard = require('./flashcard/criarFlashcard');
+const listarFlashcards = require('./flashcard/listarFlashcards');
+const listarFlashcardsPorBaralho = require('./flashcard/listarFlashcardsPorBaralho');
+const buscarFlashcardsPorPergunta = require('./flashcard/buscarFlashcardsPorPergunta');
+const atualizarFlashcard = require('./flashcard/atualizarFlashcard');
+const deletarFlascard = require('./flashcard/deletarFlashcard');
+
+
+app.post ('/baralho', async (req, res) => await criarBaralho (req, res, baralhos, flashcards))
+
+app.get ('/baralho', async (req, res) => await listarBaralhos(req, res, baralhos, flashcards))
+
+app.put ('/baralho/:id', async (req, res) => await atualizarBaralho(req, res, baralhos, flashcards))
+
+app.delete ('/baralho/:id', async (req, res) => await deletarBaralho(req, res, baralhos, flashcards))
+
+
+app.post ('/flashcard/:idBaralho', async (req, res) => await criarFlashcard(req, res, baralhos, flashcards))
+
+app.get ('/flashcard', async (req, res) => await listarFlashcards(req, res, baralhos, flashcards))
+
+app.get ('/flashcard/pergunta/:termo', async (req, res) => await buscarFlashcardsPorPergunta(req, res, baralhos, flashcards))
+
+app.get ('/flashcard/baralho/:idBaralho', async (req, res) => await listarFlashcardsPorBaralho(req, res, baralhos, flashcards))
+
+app.put ('/flashcard/:idFlashcard', async (req, res) => await atualizarFlashcard(req, res, baralhos, flashcards))
+
+app.delete ('/flashcard/:idFlashcard', async (req, res) => await deletarFlascard(req, res, baralhos, flashcards))
+
+
+
+app.get('/', (req, res) => {
+  res.send('Hello World!');
+});
+
+app.get('/users', (req, res) => {
+  res.send('Hello users!');
+});
+
+app.post('/soma', (req, res) => {
+  const { numero1, numero2 } = req.body;
+  const soma = parseInt(numero1) + parseInt(numero2);
+  res.send(`O resultado da sua soma é ${soma}`);
+});
+
+
+
+app.listen(port, () => {
+console.log(`Servidor ouve na porta ${port}`);
+});

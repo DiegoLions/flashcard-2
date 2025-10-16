@@ -1,55 +1,54 @@
-const prompt = require('prompt-sync')();
+const baralhoSchema = require("./baralho.schema.js");
+const flashcardSchema = require("../flashcard/flashcard.schema.js");
 
-module.exports = function deletarFlashcard(menu, baralhos) {
-  if (baralhos.length === 0) {
-    console.log('Nenhum baralho cadastrado para deletar flashcards.');
-    prompt('Pressione Enter para voltar...');
-    menu();
-    return;
+async function deletarFlashcard(req, res) {
+  try {
+    const { idFlashcard } = req.params;
+    const { idBaralho } = req.body;
+
+    if (!idBaralho || !idFlashcard) {
+      return res.status(400).send("IDs do baralho e do flashcard são obrigatórios.");
+    }
+
+    const objectIdRegex = /^[0-9a-zA-Z]{24}$/;
+    if (!objectIdRegex.test(idBaralho) || !objectIdRegex.test(idFlashcard)) {
+      return res
+        .status(400)
+        .send("IDs inválidos. Devem ser ObjectId válidos do MongoDB.");
+    }
+
+    const baralho = await baralhoSchema.findById(idBaralho);
+    if (!baralho) {
+      return res.status(404).send("Baralho não encontrado.");
+    }
+
+    const flashcardDeletado = await flashcardSchema.findOneAndDelete({
+      _id: idFlashcard,
+      idBaralho: idBaralho,
+    });
+
+    if (!flashcardDeletado) {
+      return res.status(404).send("Flashcard não encontrado neste baralho.");
+    }
+
+    if (baralho.flashcards && baralho.flashcards.includes(flashcardDeletado._id)) {
+      baralho.flashcards = baralho.flashcards.filter(
+        (fId) => fId.toString() !== idFlashcard
+      );
+      await baralho.save();
+    }
+
+    return res.status(200).send({
+      mensagem: "Flashcard deletado com sucesso!",
+      flashcard: flashcardDeletado,
+    });
+
+  } catch (error) {
+    console.error("Erro ao deletar flashcard:", error);
+    return res
+      .status(500)
+      .send("Erro interno do servidor ao deletar o flashcard.");
   }
+}
 
-  console.log('\n--- Baralhos Disponíveis ---');
-  baralhos.forEach(b => console.log(`ID: ${b.id} | Nome: ${b.nome}`));
-
-  const baralhoId = parseInt(prompt('Digite o ID do baralho que contém o flashcard: '));
-  const baralho = baralhos.find(b => b.id === baralhoId);
-  
-  if (!baralho) {
-    console.log('Baralho não encontrado.');
-    prompt('Pressione Enter para voltar...');
-    menu();
-    return;
-  }
-
-  if (baralho.flashcards.length === 0) {
-    console.log('Este baralho não contém flashcards para deletar.');
-    prompt('Pressione Enter para voltar...');
-    menu();
-    return;
-  }
-
-  console.log(`\nFlashcards no baralho '${baralho.nome}':`);
-  baralho.flashcards.forEach(f => console.log(`ID: ${f.id} | Pergunta: ${f.pergunta}`));
-
-  const flashcardId = parseInt(prompt('Digite o ID do flashcard que deseja deletar: '));
-  const flashcardIndex = baralho.flashcards.findIndex(f => f.id === flashcardId);
-  
-  if (flashcardIndex === -1) {
-    console.log('Flashcard não encontrado.');
-    prompt('Pressione Enter para voltar...');
-    menu();
-    return;
-  }
-
-  const confirmacao = prompt(`Tem certeza que deseja deletar o flashcard '${baralho.flashcards[flashcardIndex].pergunta}'? (s/n) `);
-  if (confirmacao.toLowerCase() === 's') {
-    baralho.flashcards.splice(flashcardIndex, 1);
-    console.log('Flashcard deletado com sucesso!');
-  } else {
-    console.log('Operação cancelada.');
-  }
-
-  prompt('Pressione Enter para voltar ao menu...');
-  menu();
-};
-//
+module.exports = deletarFlashcard;

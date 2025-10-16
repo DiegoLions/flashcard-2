@@ -1,41 +1,54 @@
-const prompt = require('prompt-sync')();
+const baralhoSchema = require("./baralho.schema.js");
+const flashcardSchema = require("../flashcard/flashcard.schema.js");
 
-module.exports = function criarFlashcard(menu, baralhos) {
-  if (baralhos.length === 0) {
-    console.log('Nenhum baralho existe. Crie um baralho primeiro para poder adicionar flashcards.');
-    prompt('Pressione Enter para voltar...');
-    menu();
-    return;
+async function criarFlashcard(req, res) {
+  try {
+    const { idBaralho } = req.params;
+    const { pergunta, resposta } = req.body;
+
+    const totalBaralhos = await baralhoSchema.countDocuments();
+    if (totalBaralhos === 0) {
+      return res
+        .status(400)
+        .send("Nenhum baralho existe. Crie um baralho primeiro para poder adicionar flashcards.");
+    }
+
+    if (!pergunta || !resposta) {
+      return res.status(400).send("Pergunta e resposta do flashcard são obrigatórias.");
+    }
+
+    if (!idBaralho || !idBaralho.match(/^[0-9a-zA-Z]{24}$/)) {
+      return res
+        .status(400)
+        .send("ID do baralho inválido. Deve ser um ObjectId do MongoDB.");
+    }
+
+    const baralho = await baralhoSchema.findById(idBaralho);
+    if (!baralho) {
+      return res.status(404).send("Baralho não encontrado.");
+    }
+
+    const novoFlashcard = new flashcardSchema({
+      idBaralho,
+      pergunta,
+      resposta,
+    });
+
+    await novoFlashcard.save();
+
+    if (baralho.flashcards) {
+      baralho.flashcards.push(novoFlashcard._id);
+      await baralho.save();
+    }
+
+    return res.status(201).send({
+      mensagem: "Flashcard adicionado com sucesso!",
+      flashcard: novoFlashcard,
+    });
+  } catch (error) {
+    console.error("Erro ao criar flashcard:", error);
+    return res.status(500).send("Erro interno do servidor ao criar flashcard.");
   }
+}
 
-  console.log('\n--- Baralhos Disponíveis ---');
-  baralhos.forEach(b => console.log(`ID: ${b.id} | Nome: ${b.nome}`));
-  
-  const baralhoId = parseInt(prompt('Digite o ID do baralho para o novo flashcard: '));
-  const baralho = baralhos.find(b => b.id === baralhoId);
-
-  if (!baralho) {
-    console.log('Baralho não encontrado.');
-    prompt('Pressione Enter para voltar...');
-    menu();
-    return;
-  }
-  
-  const pergunta = prompt('Digite a pergunta (frente do flashcard): ');
-  const resposta = prompt('Digite a resposta (verso do flashcard): ');
-
-  const id = baralho.flashcards.length > 0 ? Math.max(...baralho.flashcards.map(f => f.id)) + 1 : 1;
-
-  const novoFlashcard = {
-    id: id,
-    pergunta: pergunta,
-    resposta: resposta
-  };
-  
-  baralho.flashcards.push(novoFlashcard);
-  console.log('Flashcard adicionado com sucesso!');
-  
-  prompt('Pressione Enter para voltar ao menu...');
-  menu();
-};
-//
+module.exports = criarFlashcard;

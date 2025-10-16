@@ -1,30 +1,50 @@
-const prompt = require('prompt-sync')();
+const baralhoSchema = require("./baralho.schema.js");
+const flashcardSchema = require("../flashcard/flashcard.schema.js");
 
-module.exports = function buscarFlashcardsPorPergunta(menu, baralhos) {
+async function buscarFlashcardsPorPergunta(req, res) {
+  try {
+    const { termo } = req.params;
 
-  const todosFlashcards = baralhos.flatMap(baralho => baralho.flashcards);
+    if (!termo || termo.trim() === "") {
+      return res.status(400).send("Por favor, forneça um termo de busca.");
+    }
 
-  if (todosFlashcards.length === 0) {
-    console.log('Nenhum flashcard cadastrado.');
-    prompt('Pressione Enter para voltar...');
-    menu();
-    return;
+    const totalFlashcards = await flashcardSchema.countDocuments();
+    if (totalFlashcards === 0) {
+      return res.status(404).send("Nenhum flashcard cadastrado.");
+    }
+
+    const resultados = await flashcardSchema
+      .find({
+        pergunta: { $regex: termo, $options: "i" },
+      })
+      .populate("idBaralho", "nome");
+
+    if (resultados.length === 0) {
+      return res
+        .status(404)
+        .send(`Nenhum flashcard encontrado com o termo '${termo}' na pergunta.`);
+    }
+
+    const listaResultados = resultados
+      .map(
+        (f) =>
+          `Baralho: ${f.idBaralho?.nome || "Desconhecido"}\n` +
+          `ID: ${f._id} | Pergunta: ${f.pergunta}\n` +
+          `Resposta: ${f.resposta}\n`
+      )
+      .join("\n");
+
+    const mensagemFinal = `\n=== RESULTADOS DA BUSCA (${resultados.length} encontrados) ===\n${listaResultados}`;
+
+    return res.status(200).send(mensagemFinal);
+
+  } catch (error) {
+    console.error("Erro ao buscar flashcards por pergunta:", error);
+    return res
+      .status(500)
+      .send("Erro interno do servidor ao buscar flashcards por pergunta.");
   }
+}
 
-  const termo = prompt('Digite o termo de busca (pergunta ou resposta): ').toLowerCase();
-
-  const resultados = todosFlashcards.filter(f => f.pergunta.toLowerCase().includes(termo) || f.resposta.toLowerCase().includes(termo));
-
-  if (resultados.length === 0) {
-    console.log(`Nenhum flashcard encontrado com o termo '${termo}'.`);
-  } else {
-    console.log(`\n=== RESULTADOS DA BUSCA (${resultados.length} encontrados) ===`);
-    resultados.forEach(f => {
-      console.log(`ID: ${f.id} | Pergunta: ${f.pergunta} | Resposta: ${f.resposta}`);
-    });
-  }
-  
-  prompt('Pressione Enter para voltar ao menu...');
-  menu();
-};
-//
+module.exports = buscarFlashcardsPorPergunta;

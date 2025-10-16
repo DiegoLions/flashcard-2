@@ -1,45 +1,48 @@
-const prompt = require('prompt-sync')();
+const baralhoSchema = require("./baralho.schema.js");
+const flashcardSchema = require("../flashcard/flashcard.schema.js");
 
-module.exports = function atualizarBaralho(menu, baralhos) {
-  if (baralhos.length === 0) {
-    console.log('Nenhum baralho cadastrado para atualizar.');
-    prompt('Pressione Enter para voltar ao menu...');
-    menu();
-    return;
-  }
-  //
-  
-  
-  while (true) {
-    console.log('\n=== BARALHOS CADASTRADOS ===');
-    baralhos.forEach(baralho => {
-      console.log(`ID: ${baralho.id} | Nome: ${baralho.nome} | Flashcards: ${baralho.flashcards.length}`);
+async function atualizarBaralho(req, res) {
+  try {
+    const { id } = req.params;
+    const { nome } = req.body;
+
+    const totalBaralhos = await baralhoSchema.countDocuments();
+    if (totalBaralhos === 0) {
+      return res.status(400).send("Nenhum baralho cadastrado para atualizar.");
+    }
+
+    if (!id) {
+      return res.status(400).send("ID do baralho é obrigatório.");
+    }
+
+    if (!nome || nome.trim() === "") {
+      return res.status(400).send("O campo 'nome' é obrigatório.");
+    }
+
+    if (!id.match(/^[0-9a-zA-Z]{24}$/)) {
+      return res.status(400).send("ID inválido. O formato deve ser um ObjectId do MongoDB.");
+    }
+
+    const baralhoAtualizado = await baralhoSchema.findByIdAndUpdate(
+      id,
+      { nome: nome },
+      { new: true, runValidators: true }
+    );
+
+    if (!baralhoAtualizado) {
+      return res.status(404).send(`Não foi encontrado um baralho com o ID ${id}.`);
+    }
+ 
+    return res.status(200).send({
+      mensagem: "Baralho atualizado com sucesso!",
+      baralho: baralhoAtualizado,
     });
 
-    const id = parseInt(prompt('Digite o ID do baralho que deseja atualizar (ou "0" para cancelar): '));
-    
-    
-    if (id === 0) {
-        break;
-    }
-
-    const baralho = baralhos.find(b => b.id === id);
-
-    if (!baralho) {
-      console.log('Baralho não encontrado. Tente novamente.');
-      continue; // 
-    }
-    
-    const novoNome = prompt(`Digite o novo nome para o baralho '${baralho.nome}': `);
-    baralho.nome = novoNome;
-    console.log('Baralho atualizado com sucesso!');
-
-    const continuar = prompt('Deseja atualizar outro baralho? (s/n) ');
-    if (continuar.toLowerCase() !== 's') {
-      break; // 
-    }
+  } catch (error) {
+    console.error("Erro ao atualizar baralho:", error);
+    return res.status(500).send("Erro interno do servidor ao atualizar baralho.");
   }
-  
-  prompt('Pressione Enter para voltar ao menu...');
-  menu();
-};
+}
+
+module.exports = atualizarBaralho;
+

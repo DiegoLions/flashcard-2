@@ -1,59 +1,60 @@
-const prompt = require('prompt-sync')();
+const baralhoSchema = require("./baralho.schema.js");
+const flashcardSchema = require("../flashcard/flashcard.schema.js");
 
-module.exports = function atualizarFlashcard(menu, baralhos) {
-  if (baralhos.length === 0) {
-    console.log('Nenhum baralho cadastrado para atualizar flashcards.');
-    prompt('Pressione Enter para voltar...');
-    menu();
-    return;
+async function atualizarFlashcard(req, res) {
+  try {
+    const { idFlashcard } = req.params;
+    const { idBaralho, novaPergunta, novaResposta } = req.body;
+
+    if (!idBaralho || !idFlashcard) {
+      return res.status(400).send("IDs do baralho e do flashcard são obrigatórios.");
+    }
+
+    const objectIdRegex = /^[0-9a-zA-Z]{24}$/;
+    if (!objectIdRegex.test(idBaralho) || !objectIdRegex.test(idFlashcard)) {
+      return res
+        .status(400)
+        .send("IDs inválidos. Devem ser ObjectId válidos do MongoDB.");
+    }
+
+    if (!novaPergunta && !novaResposta) {
+      return res
+        .status(400)
+        .send("Nenhum dado para atualizar foi fornecido (novaPergunta ou novaResposta).");
+    }
+
+    const baralho = await baralhoSchema.findById(idBaralho);
+    if (!baralho) {
+      return res.status(404).send("Baralho não encontrado.");
+    }
+
+    const atualizacoes = {};
+    if (novaPergunta && novaPergunta.trim() !== "") atualizacoes.pergunta = novaPergunta;
+    if (novaResposta && novaResposta.trim() !== "") atualizacoes.resposta = novaResposta;
+
+    const flashcardAtualizado = await flashcardSchema.findOneAndUpdate(
+      { _id: idFlashcard, idBaralho: idBaralho },
+      { $set: atualizacoes },
+      { new: true }
+    );
+
+    if (!flashcardAtualizado) {
+      return res
+        .status(404)
+        .send("Flashcard não encontrado neste baralho.");
+    }
+
+    return res.status(200).send({
+      mensagem: "Flashcard atualizado com sucesso!",
+      flashcard: flashcardAtualizado,
+    });
+
+  } catch (error) {
+    console.error("Erro ao atualizar flashcard:", error);
+    return res
+      .status(500)
+      .send("Erro interno do servidor ao atualizar o flashcard.");
   }
+}
 
-  console.log('\n--- Baralhos Disponíveis ---');
-  baralhos.forEach(b => console.log(`ID: ${b.id} | Nome: ${b.nome}`));
-
-  const baralhoId = parseInt(prompt('Digite o ID do baralho que contém o flashcard: '));
-  const baralho = baralhos.find(b => b.id === baralhoId);
-  
-  if (!baralho) {
-    console.log('Baralho não encontrado.');
-    prompt('Pressione Enter para voltar...');
-    menu();
-    return;
-  }
-
-  if (baralho.flashcards.length === 0) {
-    console.log('Este baralho não contém flashcards para atualizar.');
-    prompt('Pressione Enter para voltar...');
-    menu();
-    return;
-  }
-
-  console.log(`\nFlashcards no baralho '${baralho.nome}':`);
-  baralho.flashcards.forEach(f => console.log(`ID: ${f.id} | Pergunta: ${f.pergunta}`));
-
-  const flashcardId = parseInt(prompt('Digite o ID do flashcard que deseja atualizar: '));
-  const flashcard = baralho.flashcards.find(f => f.id === flashcardId);
-  
-  if (!flashcard) {
-    console.log('Flashcard não encontrado.');
-    prompt('Pressione Enter para voltar...');
-    menu();
-    return;
-  }
-  
-  const novaPergunta = prompt(`Nova pergunta (deixe em branco para manter a atual '${flashcard.pergunta}'): `);
-  const novaResposta = prompt(`Nova resposta (deixe em branco para manter a atual '${flashcard.resposta}'): `);
-
-  if (novaPergunta.trim() !== '') {
-    flashcard.pergunta = novaPergunta;
-  }
-  if (novaResposta.trim() !== '') {
-    flashcard.resposta = novaResposta;
-  }
-  
-  console.log('Flashcard atualizado com sucesso!');
-  
-  prompt('Pressione Enter para voltar ao menu...');
-  menu();
-};
-//
+module.exports = atualizarFlashcard;
