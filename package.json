@@ -3,5 +3,9 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "mongoose": "^8.18.2"
+  },
+  "scripts": {
+    "build": "npm install",
+    "start": "node flashcard-2/index.js"
   }
 }
