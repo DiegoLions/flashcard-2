@@ -6,6 +6,6 @@
   },
   "scripts": {
     "build": "npm install",
-    "start": "node flashcard-2/index.js"
+    "start": "node index.js"
   }
 }
